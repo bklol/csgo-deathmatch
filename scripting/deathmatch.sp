@@ -488,6 +488,7 @@ public void OnMapStart()
         if (IsClientConnected(i))
             ResetClientSettings(i);
     }
+    PrecacheSound("player/pl_respawn.wav");
     LoadMapConfig();
     if (g_iSpawnPointCount > 0)
     {
@@ -3015,11 +3016,45 @@ void MovePlayer(int client)
     if (spawnPointFound)
     {
         TeleportEntity(client, g_fSpawnPositions[spawnPoint], g_fSpawnAngles[spawnPoint], NULL_VECTOR);
+        int speaker = SpawnSpeakerEntity(g_fSpawnPositions[spawnPoint], g_fSpawnAngles[spawnPoint], client, 3.0);
+        for(int i = 1; i <= MaxClients; i++)
+        { 
+            if(IsValidClient(i) && !IsFakeClient(i) && IsPlayerAlive(i))
+            {
+                EmitSoundToClient(i,"player/pl_respawn.wav", speaker, SNDCHAN_VOICE, SNDLEVEL_NORMAL, SND_NOFLAGS, 0.8, SNDPITCH_NORMAL, speaker, g_fSpawnPositions[spawnPoint], g_fSpawnAngles[spawnPoint], true);
+            }
+        }
         g_bSpawnPointOccupied[spawnPoint] = true;
         g_bPlayerMoved[client] = true;
     }
 
     if (!spawnPointFound) g_iSpawnPointSearchFailures++; /* Stats */
+}
+
+stock int SpawnSpeakerEntity(float fPos[3], float fAgl[3], int source, float removeDelay = 0.1)
+{
+    int speaker = CreateEntityByName("info_target");
+    
+    if(speaker == -1)
+        return -1;
+
+    DispatchSpawn(speaker);
+
+    TeleportEntity(speaker, fPos, fAgl, NULL_VECTOR);
+
+    SetVariantString("!activator");
+    AcceptEntityInput(speaker, "SetParent", source, speaker, 0);
+
+    if(removeDelay > 0.0)
+    {
+        char input[128];
+        FormatEx(input, 128, "OnUser4 !self:Kill::%.2f:1", removeDelay);
+        SetVariantString(input);
+        AcceptEntityInput(speaker, "AddOutput");
+        AcceptEntityInput(speaker, "FireUser4");
+    }
+
+    return speaker;
 }
 
 bool IsPointSuitableDistance(int spawnPoint, float[][3] enemyEyePositions, int numberOfEnemies)
